@@ -163,7 +163,7 @@
     status.textContent = 'Translating...';
 
     try {
-      const res = await fetch('http://localhost:3000/translate', {
+      const res = await fetch('/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word: raw })
