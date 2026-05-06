@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spanish Word Bank</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f3;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .app { width: 100%; max-width: 680px; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
+    .header h1 { font-size: 22px; font-weight: 500; }
+    .header p { font-size: 13px; color: #888; margin-top: 4px; }
+    .stat { background: #ebebeb; border-radius: 8px; padding: 8px 16px; text-align: center; min-width: 64px; }
+    .stat-n { font-size: 22px; font-weight: 500; }
+    .stat-l { font-size: 12px; color: #888; }
+    .add-row { display: flex; gap: 8px; margin-bottom: 6px; }
+    .add-row input { flex: 1; padding: 10px 14px; border: 0.5px solid #ccc; border-radius: 8px; font-size: 15px; outline: none; background: #fff; }
+    .add-row input:focus { border-color: #888; }
+    .add-row button { padding: 10px 20px; border: 0.5px solid #ccc; border-radius: 8px; background: #fff; font-size: 15px; cursor: pointer; }
+    .add-row button:hover { background: #ebebeb; }
+    .add-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .add-status { font-size: 13px; color: #888; min-height: 20px; margin-bottom: 1.25rem; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 1.25rem; }
+    .tab { background: transparent; border: 0.5px solid #ccc; border-radius: 8px; padding: 6px 18px; font-size: 14px; cursor: pointer; color: #888; }
+    .tab.active { background: #ebebeb; color: #1a1a1a; font-weight: 500; }
+    .section { display: none; }
+    .section.on { display: block; }
+    .search { width: 100%; padding: 10px 14px; border: 0.5px solid #ccc; border-radius: 8px; font-size: 14px; margin-bottom: 1rem; outline: none; background: #fff; }
+    .list-header { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 6px 10px; font-size: 12px; color: #888; border-bottom: 0.5px solid #e0e0e0; }
+    .word-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 10px; border-radius: 8px; align-items: center; font-size: 14px; }
+    .word-row:hover { background: #ebebeb; }
+    .word-row .en { color: #888; }
+    .del-btn { background: transparent; border: none; color: #aaa; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 6px; }
+    .del-btn:hover { color: #e24b4a; }
+    .empty { text-align: center; color: #888; font-size: 14px; padding: 2rem 0; }
+    .quiz-modes { display: flex; gap: 8px; justify-content: center; margin-bottom: 1.25rem; }
+    .card-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 1rem 0; }
+    .card { width: 100%; max-width: 420px; min-height: 180px; background: #fff; border: 0.5px solid #ccc; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .card:hover { background: #f9f9f9; }
+    .card-inner { text-align: center; padding: 2rem; }
+    .card-lang { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; }
+    .card-word { font-size: 30px; font-weight: 500; }
+    .card-hint { font-size: 13px; color: #aaa; margin-top: 10px; }
+    .card-controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .card-controls button, .quiz-modes button { padding: 8px 18px; border: 0.5px solid #ccc; border-radius: 8px; background: #fff; font-size: 14px; cursor: pointer; }
+    .card-controls button:hover, .quiz-modes button:hover { background: #ebebeb; }
+    .quiz-modes button.active { background: #ebebeb; font-weight: 500; }
+    .progress { font-size: 13px; color: #888; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div>
+      <h1>Spanish word bank</h1>
+      <p>Your growing vocabulary collection</p>
+    </div>
+    <div class="stat">
+      <div class="stat-n" id="stat-total">0</div>
+      <div class="stat-l">words</div>
+    </div>
+  </div>
+
+  <div class="add-row">
+    <input type="text" id="add-input" placeholder="Type any Spanish word or conjugation..." onkeydown="if(event.key==='Enter') addWord()" />
+    <button onclick="addWord()" id="add-btn">Add</button>
+  </div>
+  <div class="add-status" id="add-status"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('list')">Browse</button>
+    <button class="tab" onclick="switchTab('quiz')">Flashcards</button>
+  </div>
+
+  <div class="section on" id="tab-list">
+    <input type="text" class="search" placeholder="Search words..." oninput="renderList(this.value)" />
+    <div class="list-header"><span>Spanish</span><span>English</span><span></span></div>
+    <div id="word-list"></div>
+  </div>
+
+  <div class="section" id="tab-quiz">
+    <div class="quiz-modes">
+      <button class="tab active" id="mode-es" onclick="setMode('es')">Spanish → English</button>
+      <button class="tab" id="mode-en" onclick="setMode('en')">English → Spanish</button>
+    </div>
+    <div class="card-wrap">
+      <div class="card" onclick="flipCard()">
+        <div class="card-inner">
+          <div class="card-lang" id="quiz-lang">—</div>
+          <div class="card-word" id="quiz-word">Add words to start</div>
+          <div class="card-hint" id="quiz-hint"></div>
+        </div>
+      </div>
+      <p class="progress" id="quiz-prog"></p>
+      <div class="card-controls">
+        <button onclick="prevCard()">← prev</button>
+        <button onclick="flipCard()">flip</button>
+        <button onclick="nextCard()">next →</button>
+        <button onclick="shuffleDeck()">shuffle</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const STORE_KEY = 'spanish_word_bank_v1';
+
+  const SEED = [
+    { es: "podrido",   en: "rotten" },
+    { es: "derramar",  en: "to spill" },
+    { es: "acariciar", en: "to caress" },
+    { es: "ranchear",  en: "to ranch" },
+    { es: "titilar",   en: "to twinkle / to flicker" },
+    { es: "transar",   en: "to make a shady deal / to compromise" },
+    { es: "malgastar", en: "to waste / to squander" },
+    { es: "movida",    en: "move / scheme / scene" },
+    { es: "fetén",     en: "great / fantastic / authentic" },
+    { es: "frontear",  en: "to front / to show off / to act tough" },
+    { es: "restregar", en: "to scrub / to rub hard" },
+  ];
+
+  const GROUPS = {
+    "transar": "slang-deal",
+    "movida":  "slang-deal",
+  };
+
+  let words = [];
+  let qIdx = 0, qFlipped = false, qMode = 'es', qOrder = [];
+
+  function init() {
+    const saved = localStorage.getItem(STORE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const savedEs = new Set(parsed.map(w => w.es));
+      words = [...parsed];
+      SEED.forEach(s => { if (!savedEs.has(s.es)) words.push({ ...s, added: Date.now() }); });
+    } else {
+      words = SEED.map(s => ({ ...s, added: Date.now() }));
+    }
+    localStorage.setItem(STORE_KEY, JSON.stringify(words));
+    updateStats(); renderList(''); initQuiz();
+  }
+
+  async function addWord() {
+    const input = document.getElementById('add-input');
+    const btn = document.getElementById('add-btn');
+    const status = document.getElementById('add-status');
+    const raw = input.value.trim();
+    if (!raw) return;
+
+    btn.disabled = true;
+    btn.textContent = '...';
+    status.style.color = '#888';
+    status.textContent = 'Translating...';
+
+    try {
+      const res = await fetch('http://localhost:3000/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word: raw })
+      });
+
+      const parsed = await res.json();
+      if (!parsed.es || !parsed.en) throw new Error('bad response');
+
+      const dupe = words.find(w => w.es === parsed.es);
+      if (dupe) {
+        status.style.color = '#888';
+        status.textContent = `"${parsed.es}" is already in your bank.`;
+      } else {
+        words.push({ es: parsed.es, en: parsed.en, added: Date.now() });
+        localStorage.setItem(STORE_KEY, JSON.stringify(words));
+        updateStats();
+        renderList(document.querySelector('.search')?.value || '');
+        initQuiz();
+        status.style.color = '#1D9E75';
+        status.textContent = `Added: ${parsed.es} = ${parsed.en}`;
+        input.value = '';
+      }
+    } catch(e) {
+      status.style.color = '#e24b4a';
+      status.textContent = 'Something went wrong — is the server running?';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Add';
+    setTimeout(() => { status.textContent = ''; }, 4000);
+  }
+
+  function updateStats() {
+    document.getElementById('stat-total').textContent = words.length;
+  }
+
+  function switchTab(name) {
+    ['list','quiz'].forEach(t => document.getElementById('tab-'+t).classList.toggle('on', t===name));
+    document.querySelectorAll('.tabs .tab').forEach((b,i) => b.classList.toggle('active', ['list','quiz'][i]===name));
+    if (name==='quiz') initQuiz();
+  }
+
+  function renderList(filter) {
+    const container = document.getElementById('word-list');
+    const f = filter.toLowerCase();
+    const filtered = words.filter(w => w.es.includes(f) || w.en.includes(f));
+    if (!filtered.length) {
+      container.innerHTML = `<div class="empty">${words.length===0 ? 'No words yet!' : 'No matches.'}</div>`;
+      return;
+    }
+    const groups = {};
+    const ungrouped = [];
+    filtered.forEach(w => {
+      const g = GROUPS[w.es];
+      if (g) { if (!groups[g]) groups[g]=[]; groups[g].push(w); }
+      else ungrouped.push(w);
+    });
+    let html = '';
+    Object.values(groups).forEach(grp => {
+      grp.forEach((w, i) => {
+        const idx = words.indexOf(w);
+        const border = i < grp.length-1 ? 'border-bottom: 0.5px dashed #e0e0e0;' : '';
+        html += `<div class="word-row" style="${border}"><span>${w.es}</span><span class="en">${w.en}</span><button class="del-btn" onclick="deleteWord(${idx})">✕</button></div>`;
+      });
+      html += `<div style="height:4px;"></div>`;
+    });
+    ungrouped.forEach(w => {
+      const idx = words.indexOf(w);
+      html += `<div class="word-row"><span>${w.es}</span><span class="en">${w.en}</span><button class="del-btn" onclick="deleteWord(${idx})">✕</button></div>`;
+    });
+    container.innerHTML = html;
+  }
+
+  function deleteWord(idx) {
+    words.splice(idx, 1);
+    localStorage.setItem(STORE_KEY, JSON.stringify(words));
+    updateStats();
+    renderList(document.querySelector('.search')?.value || '');
+  }
+
+  function setMode(m) {
+    qMode = m;
+    document.getElementById('mode-es').classList.toggle('active', m==='es');
+    document.getElementById('mode-en').classList.toggle('active', m==='en');
+    initQuiz();
+  }
+
+  function initQuiz() { qOrder = words.map((_,i)=>i); qIdx=0; qFlipped=false; renderCard(); }
+
+  function shuffleDeck() {
+    for (let i=qOrder.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [qOrder[i],qOrder[j]]=[qOrder[j],qOrder[i]]; }
+    qIdx=0; qFlipped=false; renderCard();
+  }
+
+  function renderCard() {
+    if (!qOrder.length) { document.getElementById('quiz-word').textContent='Add words to start'; document.getElementById('quiz-prog').textContent=''; return; }
+    const w = words[qOrder[qIdx]];
+    if (!w) return;
+    document.getElementById('quiz-lang').textContent = !qFlipped ? (qMode==='es'?'Spanish':'English') : (qMode==='es'?'English':'Spanish');
+    document.getElementById('quiz-word').textContent = !qFlipped ? (qMode==='es'?w.es:w.en) : (qMode==='es'?w.en:w.es);
+    document.getElementById('quiz-hint').textContent = !qFlipped ? 'click to reveal' : '';
+    document.getElementById('quiz-prog').textContent = `${qIdx+1} / ${qOrder.length}`;
+  }
+
+  function flipCard() { qFlipped=!qFlipped; renderCard(); }
+  function nextCard() { qFlipped=false; qIdx=(qIdx+1)%qOrder.length; renderCard(); }
+  function prevCard() { qFlipped=false; qIdx=(qIdx-1+qOrder.length)%qOrder.length; renderCard(); }
+
+  init();
+</script>
+</body>
+</html>
