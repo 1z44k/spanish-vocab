@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const https = require('https');
+const { Pool } = require('pg');
 
 const app = express();
 app.use(cors());
@@ -9,15 +10,53 @@ app.use(express.static('.'));
 
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 
-app.post('/translate', (req, res) => {
-  console.log('Request received:', req.body);
-  const { word } = req.body;
-  console.log('Word:', word);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
 
-  if (!word) {
-    res.status(400).json({ error: 'No word provided' });
-    return;
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS words (
+      id SERIAL PRIMARY KEY,
+      es TEXT NOT NULL,
+      en TEXT NOT NULL,
+      added BIGINT NOT NULL
+    )
+  `);
+  console.log('Database ready');
+}
+
+app.get('/words', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM words ORDER BY added ASC');
+    res.json(result.rows);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
   }
+});
+
+app.post('/words', async (req, res) => {
+  try {
+    const { es, en, added } = req.body;
+    await pool.query('INSERT INTO words (es, en, added) VALUES ($1, $2, $3)', [es, en, added]);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/words/:es', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM words WHERE es = $1', [req.params.es]);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/translate', (req, res) => {
+  const { word } = req.body;
 
   const prompt = `The user typed a Spanish word or conjugation: "${word}". If it is a verb conjugation, convert to the infinitive. Give a concise English translation, use "/" to separate multiple meanings. If slang, note it briefly. Return ONLY a JSON object with keys "es" and "en", both lowercase. No markdown, no extra text. Example: {"es":"correr","en":"to run"}`;
 
@@ -64,4 +103,8 @@ app.post('/translate', (req, res) => {
   request.end();
 });
 
-app.listen(3000, () => console.log('Server running at http://localhost:3000'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, async () => {
+  await initDB();
+  console.log(`Server running on port ${PORT}`);
+});

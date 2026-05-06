@@ -35,6 +35,7 @@
     .section { display: none; }
     .section.on { display: block; }
     .search { width: 100%; padding: 10px 14px; border: 0.5px solid #ccc; border-radius: 8px; font-size: 14px; margin-bottom: 1rem; outline: none; background: #fff; }
+    .search:focus { border-color: #888; }
     .list-header { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 6px 10px; font-size: 12px; color: #888; border-bottom: 0.5px solid #e0e0e0; }
     .word-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 10px; border-radius: 8px; align-items: center; font-size: 14px; }
     .word-row:hover { background: #ebebeb; }
@@ -112,22 +113,6 @@
 </div>
 
 <script>
-  const STORE_KEY = 'spanish_word_bank_v1';
-
-  const SEED = [
-    { es: "podrido",   en: "rotten" },
-    { es: "derramar",  en: "to spill" },
-    { es: "acariciar", en: "to caress" },
-    { es: "ranchear",  en: "to ranch" },
-    { es: "titilar",   en: "to twinkle / to flicker" },
-    { es: "transar",   en: "to make a shady deal / to compromise" },
-    { es: "malgastar", en: "to waste / to squander" },
-    { es: "movida",    en: "move / scheme / scene" },
-    { es: "fetén",     en: "great / fantastic / authentic" },
-    { es: "frontear",  en: "to front / to show off / to act tough" },
-    { es: "restregar", en: "to scrub / to rub hard" },
-  ];
-
   const GROUPS = {
     "transar": "slang-deal",
     "movida":  "slang-deal",
@@ -136,17 +121,13 @@
   let words = [];
   let qIdx = 0, qFlipped = false, qMode = 'es', qOrder = [];
 
-  function init() {
-    const saved = localStorage.getItem(STORE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      const savedEs = new Set(parsed.map(w => w.es));
-      words = [...parsed];
-      SEED.forEach(s => { if (!savedEs.has(s.es)) words.push({ ...s, added: Date.now() }); });
-    } else {
-      words = SEED.map(s => ({ ...s, added: Date.now() }));
+  async function init() {
+    try {
+      const res = await fetch('/words');
+      words = await res.json();
+    } catch(e) {
+      words = [];
     }
-    localStorage.setItem(STORE_KEY, JSON.stringify(words));
     updateStats(); renderList(''); initQuiz();
   }
 
@@ -177,8 +158,13 @@
         status.style.color = '#888';
         status.textContent = `"${parsed.es}" is already in your bank.`;
       } else {
-        words.push({ es: parsed.es, en: parsed.en, added: Date.now() });
-        localStorage.setItem(STORE_KEY, JSON.stringify(words));
+        const newWord = { es: parsed.es, en: parsed.en, added: Date.now() };
+        await fetch('/words', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newWord)
+        });
+        words.push(newWord);
         updateStats();
         renderList(document.querySelector('.search')?.value || '');
         initQuiz();
@@ -224,22 +210,20 @@
     let html = '';
     Object.values(groups).forEach(grp => {
       grp.forEach((w, i) => {
-        const idx = words.indexOf(w);
         const border = i < grp.length-1 ? 'border-bottom: 0.5px dashed #e0e0e0;' : '';
-        html += `<div class="word-row" style="${border}"><span>${w.es}</span><span class="en">${w.en}</span><button class="del-btn" onclick="deleteWord(${idx})">✕</button></div>`;
+        html += `<div class="word-row" style="${border}"><span>${w.es}</span><span class="en">${w.en}</span><button class="del-btn" onclick="deleteWord('${w.es}')">✕</button></div>`;
       });
       html += `<div style="height:4px;"></div>`;
     });
     ungrouped.forEach(w => {
-      const idx = words.indexOf(w);
-      html += `<div class="word-row"><span>${w.es}</span><span class="en">${w.en}</span><button class="del-btn" onclick="deleteWord(${idx})">✕</button></div>`;
+      html += `<div class="word-row"><span>${w.es}</span><span class="en">${w.en}</span><button class="del-btn" onclick="deleteWord('${w.es}')">✕</button></div>`;
     });
     container.innerHTML = html;
   }
 
-  function deleteWord(idx) {
-    words.splice(idx, 1);
-    localStorage.setItem(STORE_KEY, JSON.stringify(words));
+  async function deleteWord(es) {
+    await fetch(`/words/${es}`, { method: 'DELETE' });
+    words = words.filter(w => w.es !== es);
     updateStats();
     renderList(document.querySelector('.search')?.value || '');
   }
